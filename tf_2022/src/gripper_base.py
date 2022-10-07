@@ -13,19 +13,20 @@ class gripper_to_base:
         self.br = tf.TransformBroadcaster(queue_size=1)
     
     def broadcasting(self, gripper_co):
+        print(gripper_co.position.x, gripper_co.position.y, gripper_co.position.z)
         self.br.sendTransform(
-            (gripper_co.position.x, gripper_co.position.y gripper_co.position.z),
+            (gripper_co.position.x, gripper_co.position.y, gripper_co.position.z),
             (gripper_co.orientation.x, gripper_co.orientation.y, gripper_co.orientation.z, gripper_co.orientation.w), 
             rospy.Time.now(),
-            "object_co",
-            "rgb_co"
+            "mani_co",
+            "/base_link"
         )
 
 def main():
     rospy.init_node("gripper_base")
     
-    tf = gripper_to_base
-    rospy.Subscrier("control_mani", Pose, tf.broadcast)
+    g2b = gripper_to_base()
+    rospy.Subscriber("mani_pose", Pose, g2b.broadcasting)
     
     rospy.spin()
 

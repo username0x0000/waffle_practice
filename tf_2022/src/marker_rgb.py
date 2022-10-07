@@ -5,17 +5,16 @@ import rospy
 import tf
 import math
 import numpy as np
-from gomtery_msgs.msg import Bool
 from geometry_msgs.msg import Pose
 
-class marker_to_rgb:
+class Marker_to_rgb:
     def __init__(self):
         self.br = tf.TransformBroadcaster(queue_size=1)
     
     def broadcasting(self, marker_co):
         self.br.sendTransform(
-            (marker_co.position.x, marker_co.position.y marker_co.position.z),
-            (marker_co.orientation.x, marker_co.orientation.y, marker_co.orientation.z, marker_co.orientation.w), 
+            (marker_co.position.x, marker_co.position.y, marker_co.position.z),
+            (tf.transformations.quaternion_from_euler(marker_co.orientation.x, marker_co.orientation.y, marker_co.orientation.z)), 
             rospy.Time.now(),
             "object_co",
             "rgb_co"
@@ -25,8 +24,8 @@ class marker_to_rgb:
 def main():
     rospy.init_node("marker_rgb")
     
-    tf = marker_to_rgb
-    rospy.Subscrier("ARUCO_S", Pose, tf.broadcast)
+    m2r = Marker_to_rgb()
+    rospy.Subscriber("ARUCO_P", Pose, m2r.broadcasting)
     
     rospy.spin()
 

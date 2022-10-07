@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(tf)
+project(tf_2022)
 
 find_package(catkin REQUIRED COMPONENTS
   geometry_msgs

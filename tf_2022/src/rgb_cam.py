@@ -5,22 +5,24 @@ import rospy
 import tf
 import math
 import numpy as np
+from std_msgs.msg import Bool
 from geometry_msgs.msg import Pose
 
 
 def main():
-    rospy.init_node("cam_gripper")
+    rospy.init_node("rgb_cam")
     
-    rate = rospy.Rate(50)
+    rate = rospy.Rate(100)
     
-    while rospy.is_shutdown():
-        br = tf.TransformBroadcaster(queue_size=1)
+    br = tf.TransformBroadcaster(queue_size=1)
+        
+    while not rospy.is_shutdown():
         br.sendTransform(
-            (-0.06, 0, 0.04),
-            tf.transformations.quaternion_from_euler(0, 0, 0),
+            (0, 0, 0),
+            tf.transformations.quaternion_from_euler(-np.pi / 2, 0, -np.pi / 2),
             rospy.Time.now(),
-            "cam_co",
-            "mani_co"
+            "rgb_co",
+            "cam_co"
         )
         rate.sleep()
 
