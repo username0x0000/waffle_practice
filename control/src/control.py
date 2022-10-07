@@ -16,7 +16,6 @@ mani_object_catch = 3
 mani_object_release = 4
 mani_fail = 0
 mani_success = 1
-mani_working = 2
 
 
 class control_tower:
@@ -41,15 +40,13 @@ class control_tower:
             "patrol":self.patrol,
             "door":self.door,
             "object":self.object,
-            "home":self.home,
-            "error":self.error
+            "home":self.home
         }
-        self.error = " "
         
         # aruco, dwa, manipulator status
         self.aruco_status = "need"
         self.dwa_status = "dwa_success"
-        self.mani_status = mani_success
+        self.mani_status = "mani_success"
         
         # 카메라의 진동에의한 흔들림 제거
         self.rate = rospy.Rate(1)
@@ -57,8 +54,7 @@ class control_tower:
 
     def check_mode(self):
         print(self.mode, self.control_status)
-        if (self.dwa_status == "dwa_success" and self.aruco_status == "wait" and self.mani_status != mani_working) or self.control_status == "patrol" or (self.mode == "patrol" and self.dwa_status != "dwa_working"):
-            # mani_status mani_door_catch랑 mani_fail이랑 변수 겹쳐서 작동 안함 변경 필요
+        if self.dwa_status != "dwa_working" and self.mani_status != "mani_working":
             
             if self.control_status == "arrive":
                 self.rate.sleep()
@@ -68,10 +64,8 @@ class control_tower:
 
         
     def patrol(self):
-        dwa_list = ["straight_", "turn_"]
-        dwa = dwa_list[random.randrange(0, 1)] + str(random.randrange(0, 5))
-        self.pub_dm.publish(dwa)
-        dwa_status = "working"
+        self.pub_dm("patrol")
+        self.dwa_status = "dwa_working"
     
     def door(self):
         if self.control_status == "patrol":
@@ -87,14 +81,14 @@ class control_tower:
         elif self.control_status == "catchable":
             self.pub_mm.publish(mani_door_catch)
             self.pub_mp.publish(self.pose)
-            if self.mani_status == mani_fail:
+            if self.mani_status == "mani_fail":
                 self.control_status = "patrol"
                 self.aruco_status = "need"
                 return
-            elif self.mani_status == mani_success:
+            elif self.mani_status == "mani_success":
                 self.control_status = "catch"
                 return
-            self.mani_status = mani_working
+            self.mani_status = "mani_working"
         
         elif self.control_status == "catch":
             self.open_door()
@@ -103,7 +97,7 @@ class control_tower:
         elif self.control_status == "release":
             self.pub_mm.publish(mani_door_release)
             self.pub_mp.publish(self.foo_pose)
-            self.mani_status = mani_working
+            self.mani_status = "mani_working"
             self.control_status = "go inside"
         
         elif self.control_status == "go inside":
@@ -125,14 +119,14 @@ class control_tower:
         elif self.control_status == "catchable":
             self.pub_mm.publish(mani_door_catch)
             self.pub_mp.publish(self.pose)
-            if self.mani_status == mani_fail:
+            if self.mani_status == "mani_fail":
                 self.control_status = "patrol"
                 self.aruco_status = "need"
                 return
-            elif self.mani_status == mani_success:
+            elif self.mani_status == "mani_success":
                 self.control_status = "catch"
                 return
-            self.mani_status = mani_working
+            self.mani_status = "mani_working"
         
         elif self.control_status == "catch":
             self.mode = "home"
@@ -146,39 +140,13 @@ class control_tower:
         elif self.control_status == "home_arrived":
             self.pub_mm(mani_object_release)
             self.pub_mp(self.foo_pose)
-            
-    
-    def error(self):
-        print("aruco_status :", self.aruco_status)
-        print("dwa_staus :", self.dwa_status)
-        print("mani_status :", self.mani_status)
-        print("pose.position : ")
-        print("x :", self.pose.position.x)
-        print("y :", self.pose.position.y)
-        print("z :", self.pose.position.z)
-        print("pose.orientation : ")
-        print("x :", self.pose.orientation.x)
-        print("y :", self.pose.orientation.y)
-        print("z :", self.pose.orientation.z)
-        print("w :", self.pose.orientation.w)
-        print("control_status :", self.control_status)
-        print("control_mode", self.mode)
-        print("error : ", self.error)
     
     def go_inside(self):
         self.pub_dm.publish("back_8")
     
     def open_door(self):
         self.pub_dm.publish("straight_7")
-    
-    
-    def sub(self):
-        if self.aruco_status == "need":
-            rospy.Subscriber("ARUCO_ID", Int32, self.save_as)
-            rospy.Subscriber("ARUCO_P", Pose, self.save_ap)
-        
-        rospy.Subscriber("MANI", Int32, self.save_ms)
-        rospy.Subscriber("DWA", String, self.save_ds)
+
     
     def save_ap(self, a_pose):
         if self.aruco_status == "wait":
@@ -207,7 +175,9 @@ class control_tower:
             print("except :", exc)
 
     def save_as(self, a_status):
-        if a_status == 1:
+        if self.aruco_status == "wait":
+            return
+        elif a_status == 1:
             self.mode = "door"
             print("door")
         elif a_status == 2:
@@ -221,35 +191,31 @@ class control_tower:
     def save_ds(self, d_status):
         if d_status == "dwa_success":
             self.dwa_status = "dwa_success"
-        elif self.dwa_status == "dwa_working":
+        else:
             self.dwa_status = "dwa_working"
-        # else:
-        #     self.mode = "error"
-        #     self.error = "save_ds" + d_status.data
 
     def save_ms(self, m_status):
         print(m_status)
         if m_status == mani_success:
-            self.mani_status = mani_success
-        elif m_status == mani_fail:
-            self.mani_status = mani_fail
+            self.mani_status = "mani_success"
+        elif m_status == "mani_fail":
+            self.mani_status = "mani_fail"
         else:
-            self.mode = "error"
-            self.error = "save_ms" + str(m_status)
+            self.mani_status = "mani_working"
 
 def main():
     rospy.init_node("control")
     
     control = control_tower()
-    while not rospy.is_shutdown():
-        if control.mode == "error":
-            control.check_mode()
-            return
-        
-        control.sub()
-        
-        control.check_mode()
-        
+
+    rospy.Subscriber("MANI", Int32, control.save_ms)
+    rospy.Subscriber("DWA", String, control.save_ds)
+    rospy.Subscriber("ARUCO_ID", Int32, control.save_as)
+    rospy.Subscriber("ARUCO_P", Pose, control.save_ap)
+    
+    control.check_mode()
+    
+    rospy.spin()
         
 
 if __name__ == "__main__": main()
