@@ -3,7 +3,6 @@
 
 import rospy
 import tf
-import random
 from geometry_msgs.msg import Pose
 from std_msgs.msg import String, Int32
 
@@ -45,16 +44,16 @@ class control_tower:
         
         # aruco, dwa, manipulator status
         self.aruco_status = "need"
-        self.dwa_status = "dwa_success"
-        self.mani_status = "mani_success"
+        self.dwa_status = " "
+        self.mani_status = " "
         
         # 카메라의 진동에의한 흔들림 제거
         self.rate = rospy.Rate(1)
 
 
     def check_mode(self):
-        print(self.mode, self.control_status)
-        if self.dwa_status != "dwa_working" and self.mani_status != "mani_working":
+        print("(%s), (%s)\n(%s) (%s), (%s)"%(self.mode, self.control_status, self.dwa_status, self.mani_status, self.aruco_status))
+        if self.dwa_status != "dwa_working" or self.mani_status != "mani_working" or self.control_status == "patrol":
             
             if self.control_status == "arrive":
                 self.rate.sleep()
@@ -64,21 +63,22 @@ class control_tower:
 
         
     def patrol(self):
-        self.pub_dm("patrol")
-        self.dwa_status = "dwa_working"
+        self.pub_dm.publish("patrol")
+        self.init_status()
     
     def door(self):
         if self.control_status == "patrol":
             d_pose = self.pose
             d_pose.position.x -= 0.1
             self.pub_dp.publish(d_pose)
-            self.control_status = "arrive"
+            if self.dwa_status == "dwa_success":
+                self.control_status = "arrive"
             
         elif self.control_status == "arrive":
             self.aruco_status = "need"
             self.control_status = "catchable"
             
-        elif self.control_status == "catchable":
+        elif self.control_status == "catchable" and self.aruco_status == "wait":
             self.pub_mm.publish(mani_door_catch)
             self.pub_mp.publish(self.pose)
             if self.mani_status == "mani_fail":
@@ -102,7 +102,6 @@ class control_tower:
         
         elif self.control_status == "go inside":
             self.go_inside()
-            self.control_status = "patrol"
             self.mode = "patrol"
     
     def object(self):
@@ -110,13 +109,14 @@ class control_tower:
             d_pose = self.pose
             d_pose.position.x -= 0.1
             self.pub_dp.publish(d_pose)
-            self.control_status = "arrive"
+            if self.dwa_status == "dwa_success":
+                self.control_status = "arrive"
             
         elif self.control_status == "arrive":
             self.aruco_status = "need"
             self.control_status = "catchable"
             
-        elif self.control_status == "catchable":
+        elif self.control_status == "catchable" and self.aruco_status == "wait":
             self.pub_mm.publish(mani_door_catch)
             self.pub_mp.publish(self.pose)
             if self.mani_status == "mani_fail":
@@ -127,10 +127,10 @@ class control_tower:
                 self.control_status = "catch"
                 return
             self.mani_status = "mani_working"
-        
+                
         elif self.control_status == "catch":
             self.mode = "home"
-            self.control_status = "patrol"
+            self.init_status()
             
     def home(self):
         if self.control_status == "patrol":
@@ -147,11 +147,16 @@ class control_tower:
     def open_door(self):
         self.pub_dm.publish("straight_7")
 
+    def init_status(self):
+        self.control_status = "patrol"
+        self.aruco_status = "need"
+        self.dwa_status = " "
+        self.mani_status = " "
     
     def save_ap(self, a_pose):
         if self.aruco_status == "wait":
             return
-        
+        return ######################################################
         # base에서 marker까지의 좌표계 변환
         try:
             if self.control_status == "patrol":
@@ -177,28 +182,27 @@ class control_tower:
     def save_as(self, a_status):
         if self.aruco_status == "wait":
             return
-        elif a_status == 1:
+        elif a_status.data == 1:
             self.mode = "door"
-            print("door")
-        elif a_status == 2:
+        elif a_status.data == 2:
             self.mode = "object"
         else:
             self.mode = "error"
-            self.error = "save_as" + a_status
-            print(a_status)
+            self.error = "save_as" + str(a_status.data)
+            print(a_status.data)
             return
+        self.aruco_status = "wait" ######################################################
 
     def save_ds(self, d_status):
-        if d_status == "dwa_success":
+        if d_status.data == "dwa_success":
             self.dwa_status = "dwa_success"
-        else:
-            self.dwa_status = "dwa_working"
+        elif d_status.data == "dwa_working":
+            self.dwa_status.data = "dwa_working"
 
     def save_ms(self, m_status):
-        print(m_status)
-        if m_status == mani_success:
+        if m_status.data == mani_success:
             self.mani_status = "mani_success"
-        elif m_status == "mani_fail":
+        elif m_status.data == mani_fail:
             self.mani_status = "mani_fail"
         else:
             self.mani_status = "mani_working"
@@ -208,14 +212,14 @@ def main():
     
     control = control_tower()
 
-    rospy.Subscriber("MANI", Int32, control.save_ms)
-    rospy.Subscriber("DWA", String, control.save_ds)
-    rospy.Subscriber("ARUCO_ID", Int32, control.save_as)
-    rospy.Subscriber("ARUCO_P", Pose, control.save_ap)
+    while True:
+        rospy.Subscriber("MANI", Int32, control.save_ms)
+        rospy.Subscriber("DWA", String, control.save_ds)
+        rospy.Subscriber("ARUCO_ID", Int32, control.save_as)
+        rospy.Subscriber("ARUCO_P", Pose, control.save_ap)
+        control.check_mode()
+    #rospy.spin()
     
-    control.check_mode()
-    
-    rospy.spin()
         
 
 if __name__ == "__main__": main()
