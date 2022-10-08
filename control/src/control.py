@@ -50,7 +50,6 @@ class control_tower:
         # 카메라의 진동에의한 흔들림 제거
         self.rate = rospy.Rate(1)
 
-
     def check_mode(self):
         print("(%s), (%s)\n(%s) (%s), (%s)"%(self.mode, self.control_status, self.dwa_status, self.mani_status, self.aruco_status))
         if self.dwa_status != "dwa_working" or self.mani_status != "mani_working" or self.control_status == "patrol":
@@ -61,7 +60,6 @@ class control_tower:
             
             self.mode_list[self.mode]()
 
-        
     def patrol(self):
         self.pub_dm.publish("patrol")
         self.init_status()
@@ -142,10 +140,10 @@ class control_tower:
             self.pub_mp(self.foo_pose)
     
     def go_inside(self):
-        self.pub_dm.publish("back_8")
+        self.pub_dm.publish("go_inside")
     
     def open_door(self):
-        self.pub_dm.publish("straight_7")
+        self.pub_dm.publish("open_door")
 
     def init_status(self):
         self.control_status = "patrol"
@@ -156,7 +154,6 @@ class control_tower:
     def save_ap(self, a_pose):
         if self.aruco_status == "wait":
             return
-        return ######################################################
         # base에서 marker까지의 좌표계 변환
         try:
             if self.control_status == "patrol":
@@ -191,7 +188,6 @@ class control_tower:
             self.error = "save_as" + str(a_status.data)
             print(a_status.data)
             return
-        self.aruco_status = "wait" ######################################################
 
     def save_ds(self, d_status):
         if d_status.data == "dwa_success":
@@ -218,8 +214,5 @@ def main():
         rospy.Subscriber("ARUCO_ID", Int32, control.save_as)
         rospy.Subscriber("ARUCO_P", Pose, control.save_ap)
         control.check_mode()
-    #rospy.spin()
-    
-        
 
 if __name__ == "__main__": main()
